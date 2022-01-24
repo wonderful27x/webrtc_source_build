@@ -24,15 +24,15 @@ proxy = "socks5h://127.0.0.1:1080"
 
 2.设置wget代理,参考/etc/wgetrc(方式：配置文件,用完后应当恢复)(对sudo无效)  
 vim ~/.wgetrc  
-# You can set the default proxies for Wget to use for http, https, and ftp.  
-# They will override the value in the environment.  
+#You can set the default proxies for Wget to use for http, https, and ftp.  
+#They will override the value in the environment.  
 #https_proxy = http://proxy.yoyodyne.com:18023/  
 #http_proxy = http://proxy.yoyodyne.com:18023/  
 #ftp_proxy = http://proxy.yoyodyne.com:18023/  
 https_proxy = http://127.0.0.1:1080/  
 http_proxy = http://127.0.0.1:1080/  
 ftp_proxy = http://127.0.0.1:1080/  
-# If you do not want to use proxy at all, set this to off.  
+#If you do not want to use proxy at all, set this to off.  
 #use_proxy = on  
 use_proxy = on  
 
@@ -57,9 +57,9 @@ export DEPOT_TOOLS_UPDATE=0
 #设置代理  
 #在depot_tools下新建文件http_proxy.boto  
 #然后输入:  
-#	[Boto]  
-#	proxy = 127.0.0.1  
-#	proxy_port = 1080  
+ 	[Boto]  
+ 	proxy = 127.0.0.1  
+ 	proxy_port = 1080  
 #设置环境变量NO_AUTH_BOTO_CONFIG指向此文件  
 export NO_AUTH_BOTO_CONFIG=/home/wonderful/wonderful/tools/depot_tools/http_proxy.boto  
 
