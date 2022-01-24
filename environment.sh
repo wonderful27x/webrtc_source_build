@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#============代理proxy================
+#============代理proxy===================
 #export HTTP_PROXY=http://127.0.0.1:1080
 #export HTTPS_PROXY=https://127.0.0.1:1080
 #export HTTP_PROXY=socks5://127.0.0.1:1080
