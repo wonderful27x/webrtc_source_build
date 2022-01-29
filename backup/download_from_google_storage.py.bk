@@ -105,9 +105,14 @@ class Gsutil(object):
     return subprocess2.call(cmd, env=self.get_sub_env())
 
   def check_call(self, *args):
+    print('download_from_google_storage.py run on gsutil.check_call...')
     cmd = [self.VPYTHON3, self.path]
     cmd.extend(args)
-    print('gsutil.check_call,cmd: ' + str(cmd))
+    print('download_from_google_storage.py call subprocess2.communicate(cmd,stdout,stderr,env)...')
+    print('download_from_google_storage.py cmd: ' + str(cmd)) 
+    print('download_from_google_storage.py stdout: ' + str(subprocess2.PIPE)) 
+    print('download_from_google_storage.py stderr: ' + str(subprocess2.PIPE)) 
+    print('download_from_google_storage.py env: ' + str(self.get_sub_env())) 
     ((out, err), code) = subprocess2.communicate(
         cmd,
         stdout=subprocess2.PIPE,
@@ -118,14 +123,19 @@ class Gsutil(object):
     err = err.decode('utf-8', 'replace')
 
     # Parse output.
+    print('download_from_google_storage.py parse output')
     status_code_match = re.search('status=([0-9]+)', err)
     if status_code_match:
+      print('download_from_google_storage.py return with(int(...))')
       return (int(status_code_match.group(1)), out, err)
     if ('You are attempting to access protected data with '
         'no configured credentials.' in err):
+      print('download_from_google_storage.py return with 403')
       return (403, out, err)
     if 'matched no objects' in err:
+      print('download_from_google_storage.py return with 404')
       return (404, out, err)
+    print('download_from_google_storage.py return with code: ' + str(code))
     return (code, out, err)
 
   def check_call_with_retries(self, *args):
@@ -242,10 +252,9 @@ def _validate_tar_file(tar, prefix):
 def _downloader_worker_thread(thread_num, q, force, base_url,
                               gsutil, out_q, ret_codes, verbose, extract,
                               delete=True):
+  print('download_from_google_storage.py run on _download_worker_thread...')
   while True:
     input_sha1_sum, output_filename = q.get()
-    print('worker_thread running while true...')
-    print('queue.get(),input_sha1_sum=' + str(input_sha1_sum) + ',output_filename=' + str(output_filename))
     if input_sha1_sum is None:
       return
     extract_dir = None
@@ -277,16 +286,18 @@ def _downloader_worker_thread(thread_num, q, force, base_url,
         continue
     # Check if file exists.
     file_url = '%s/%s' % (base_url, input_sha1_sum)
-    #(code, _, err) = gsutil.check_call('ls', file_url)
-    print('jump for checking file exists, file_url: ' + file_url)
-    code = 0
+    print('download_from_google_storage.py check if file exists,url: ' + file_url)
+    print('download_from_google_storage.py call gsutil.check_call(ls)...')
+    (code, _, err) = gsutil.check_call('ls', file_url)
     if code != 0:
       if code == 404:
+        print('download_from_google_storage.py code=404')
         out_q.put('%d> File %s for %s does not exist, skipping.' % (
             thread_num, file_url, output_filename))
         ret_codes.put((1, 'File %s for %s does not exist.' % (
             file_url, output_filename)))
       elif code == 401:
+        print('download_from_google_storage.py code=401')
         out_q.put(
             """%d> Failed to fetch file %s for %s due to unauthorized access,
             skipping. Try running `gsutil.py config` and pass 0 if you don't
@@ -295,13 +306,16 @@ def _downloader_worker_thread(thread_num, q, force, base_url,
             (1, 'Failed to fetch file %s for %s due to unauthorized access.' %
              (file_url, output_filename)))
       else:
+        print('download_from_google_storage.py code=else')
         # Other error, probably auth related (bad ~/.boto, etc).
         out_q.put('%d> Failed to fetch file %s for %s, skipping. [Err: %s]' %
                   (thread_num, file_url, output_filename, err))
         ret_codes.put((1, 'Failed to fetch file %s for %s. [Err: %s]' %
                        (file_url, output_filename, err)))
+      print('download_from_google_storage.py continue')
       continue
     # Fetch the file.
+    print('download_from_google_storage.py fetch the file,output_filename: ' + output_filename)
     if verbose:
       out_q.put('%d> Downloading %s@%s...' %
                 (thread_num, output_filename, input_sha1_sum))
@@ -312,11 +326,7 @@ def _downloader_worker_thread(thread_num, q, force, base_url,
       if os.path.exists(output_filename):
         out_q.put('%d> Warning: deleting %s failed.' % (
             thread_num, output_filename))
-    #code, _, err = gsutil.check_call('cp', file_url, output_filename)
-    url = 'https://storage.googleapis.com/' + file_url[5:]
-    print('use curl to download, url: ' + url)
-    subprocess2.check_call(['curl','-x','socks5h://127.0.0.1:1080','-L', url, '-o', output_filename])
-    code = 0
+    code, _, err = gsutil.check_call('cp', file_url, output_filename)
     if code != 0:
       out_q.put('%d> %s' % (thread_num, err))
       ret_codes.put((code, err))
@@ -360,14 +370,11 @@ def _downloader_worker_thread(thread_num, q, force, base_url,
         out_q.put('%d> Extracting %d entries from %s to %s' %
                   (thread_num, len(tar.getmembers()),output_filename,
                    extract_dir))
-        print('open: ' + extract_dir + '.tmp' + ',then tar.extractall...')
         with open(extract_dir + '.tmp', 'a'):
           tar.extractall(path=dirname)
         os.remove(extract_dir + '.tmp')
-    print('set executable bit...')
     # Set executable bit.
     if sys.platform == 'cygwin':
-      print('sys.platform=cygwin')
       # Under cygwin, mark all files as executable. The executable flag in
       # Google Storage will not be set when uploading from Windows, so if
       # this script is running under cygwin and we're downloading an
@@ -375,27 +382,15 @@ def _downloader_worker_thread(thread_num, q, force, base_url,
       st = os.stat(output_filename)
       os.chmod(output_filename, st.st_mode | stat.S_IEXEC)
     elif sys.platform != 'win32':
-      print('sys.platform!=win32')
       # On non-Windows platforms, key off of the custom header
       # "x-goog-meta-executable".
-      #code, out, err = gsutil.check_call('stat', file_url)
-      t = time.time()
-      st = str(int(round(t*1000000)))
-      stat_file = st + '.stat'
-      url = 'https://storage.googleapis.com/' + file_url[5:]
-      cmd = ['curl','-x','socks5h://127.0.0.1:1080','-I', url,'-o',stat_file]
-      subprocess2.check_call(cmd)
-      with open(stat_file,"r") as f:
-        out = f.read()
-      os.remove(stat_file)
-      code = 0
+      code, out, err = gsutil.check_call('stat', file_url)
       if code != 0:
         out_q.put('%d> %s' % (thread_num, err))
         ret_codes.put((code, err))
       elif re.search(r'executable:\s*1', out):
         st = os.stat(output_filename)
         os.chmod(output_filename, st.st_mode | stat.S_IEXEC)
-    print('the end')
 
 
 class PrinterThread(threading.Thread):
@@ -447,17 +442,17 @@ def download_from_google_storage(
     input_filename, base_url, gsutil, num_threads, directory, recursive,
     force, output, ignore_errors, sha1_file, verbose, auto_platform, extract):
 
-  print('running download_from_google_storage(...)...')
+  print('download_from_google_storage.py run on download_from_googe_storage...')
   # Tuples of sha1s and paths.
   input_data = list(enumerate_input(
       input_filename, directory, recursive, ignore_errors, output, sha1_file,
       auto_platform))
-  print('input_data: ' + str(input_data))
 
   # Sequentially check for the most common case and see if we can bail out
   # early before making any slow calls to gsutil.
   if not force and all(
       _data_exists(sha1, path, extract) for sha1, path in input_data):
+    print('download_from_google_storage.py return download_from_googe_storage with 0')
     return 0
 
   # Call this once to ensure gsutil's update routine is called only once. Only
@@ -468,6 +463,7 @@ def download_from_google_storage(
     gsutil.check_call('version')
 
   # Start up all the worker threads.
+  print('download_from_google_storage.py start up all the worker threads')
   all_threads = []
   download_start = time.time()
   stdout_queue = queue.Queue()
@@ -487,14 +483,14 @@ def download_from_google_storage(
   printer_thread.start()
 
   # Populate our work queue.
+  print('download_from_google_storage.py Populate our work queue')
   for sha1, path in input_data:
-    print('work_queue.put(sha1=' + str(sha1) + ',path=' + str(path) + ')')
     work_queue.put((sha1, path))
   for _ in all_threads:
-    print('work_queue.put(None,None),to tell threads to stop')
     work_queue.put((None, None))  # Used to tell worker threads to stop.
 
   # Wait for all downloads to finish.
+  print('download_from_google_storage.py wait for all download to finish...')
   for t in all_threads:
     t.join()
   stdout_queue.put(None)
@@ -511,10 +507,12 @@ def download_from_google_storage(
   if printer_thread.did_print_anything:
     print('Downloading %d files took %1f second(s)' %
           (len(input_data), time.time() - download_start))
+    print('download_from_google_storage.py return download_from_googe_storage with max_ret_code: ' + str(max_ret_code))
   return max_ret_code
 
 
 def main(args):
+  print('download_from_google_storage.py run on main...')
   usage = ('usage: %prog [options] target\n'
            'Target must be:\n'
            '  (default) a sha1 sum ([A-Za-z0-9]{40}).\n'
@@ -590,6 +588,7 @@ def main(args):
       if options.verbose:
         print('The current platform doesn\'t match "%s", skipping.' %
               options.platform)
+      print('download_from_google_storage.py return main with 0')
       return 0
 
   # Set the boto file to /dev/null if we don't need auth.
@@ -611,6 +610,9 @@ def main(args):
 
   # Make sure gsutil exists where we expect it to.
   if os.path.exists(GSUTIL_DEFAULT_PATH):
+    print('gsutil = Gsutil(GSUTIL_DEFAULT_PATH,boto_path=options.boto)')
+    print('GSUTIL_DEFAULT_PATH: ' + GSUTIL_DEFAULT_PATH)
+    print('boto_path=optios.boto: ' + options.boto)
     gsutil = Gsutil(GSUTIL_DEFAULT_PATH,
                     boto_path=options.boto)
   else:
@@ -624,6 +626,7 @@ def main(args):
     print('===End note from depot_tools===')
     print()
     gsutil.check_call('version')
+    print('download_from_google_storage.py return main with gsutil.call(config)')
     return gsutil.call('config')
 
   if not args:
@@ -665,6 +668,7 @@ def main(args):
   base_url = 'gs://%s' % options.bucket
 
   try:
+    print('download_from_google_storage.py return main with download_from_google_storage(...)')
     return download_from_google_storage(
       input_filename, base_url, gsutil, options.num_threads, options.directory,
       options.recursive, options.force, options.output, options.ignore_errors,
@@ -672,6 +676,7 @@ def main(args):
       options.extract)
   except FileNotFoundError as e:
     print("Fatal error: {}".format(e))
+    print('download_from_google_storage.py return main with 1')
     return 1
 
 

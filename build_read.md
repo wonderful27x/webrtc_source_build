@@ -16,14 +16,14 @@ gclient sync 通常就是下载与当前分支匹配的各种依赖环境，是�
 #配置文件方式设置代理并不友好，能通过命令设置一次使代理对于某一应用单独起作用是最佳的选择，
 #比如下面git的设置，而像curl这类应用却没有这种设置，因此不同应用代理的设置方式会不一样，增加麻烦  
 #特别注意!!!:  
-#如的是基于~/.xxxrc配置文件方式的代理设置对于sudo的命令是不起作用的，对使用sudo的我们必须手动修改其脚本设置代理，比如python脚本中的curl需要我们自行添加-x设置代理  
+#如果是基于~/.xxxrc配置文件方式的代理设置对于sudo的命令是不起作用的，对使用sudo的我们必须手动修改其脚本设置代理，比如python脚本中的curl需要我们自行添加-x设置代理  
 
 1.设置curl代理(方式：配置文件,用完后应当恢复)(对sudo无效)  
-vim ~/.curlrc  
+vim ~/.curlrc
 proxy = "socks5h://127.0.0.1:1080"  
 
 2.设置wget代理,参考/etc/wgetrc(方式：配置文件,用完后应当恢复)(对sudo无效)  
-vim ~/.wgetrc  
+vim ~/.wgetrc
 #You can set the default proxies for Wget to use for http, https, and ftp.  
 #They will override the value in the environment.  
 #https_proxy = http://proxy.yoyodyne.com:18023/  
@@ -46,6 +46,7 @@ export https_proxy='https://127.0.0.1:1080'
 export socks5_proxy='socks5://127.0.0.1:1080'  
 
 5.设置系统代理，这样其他应用如python就可以正常访问外网(方式：配置文件,用完后应当恢复)  
+(这似乎仍然有问题，不用担心，车道山钱币右路，往下看!!!)
 vim /etc/environmen  
 export http_proxy='http://127.0.0.1:1080'  
 export https_proxy='https://127.0.0.1:1080'  
@@ -75,14 +76,30 @@ https://webrtc.googlesource.com/src/+/main/docs/native-code/development/index.md
 	只支持Ubuntu 14.04 LTS - Ubuntu 20.10，修改install-build-deps.sh脚本，  
 	找到ERROR: The only supported distros are错误的地方，直接将exit 1注释掉  
 	注意不兼容的可以有可能造成错误  
+	注意这些库是通过apt安装的，因此最好先取消所有代理
 
-2.gclient sync 过程中发现最后卡在   
-vpython3 src/testing/generate_location_tags.py --out src/testing/location_tags.json  
+2.gclient sync 卡在 install-sysroot.py
+	1).修改python脚本，使用curl代替urllib下载，具体参考back/install-sysroot.py
+ 	2).直接运行脚本(根据错误提示,有详细的命令)	
+	3).git restore install-sysroot.py 命令恢复文件
+	4).重新运行gclient sync
+
+3.gclient sync 卡在 download_from_google_storage.py
+	1).修改python脚本，使用curl代替urllib下载，具体参考back/download_from_google_storage.py
+ 	2).直接运行脚本(根据错误提示,有详细的命令)	
+	   如:python3 src/third_party/depot_tools/download_from_google_storage.py download_from_google_storage --directory --recursive --num_threads=10 --no_auth --quiet --bucket chromium-webrtc-resources src/resources
+	3).git restore download_from_google_storage.py 命令恢复文件
+	4).重新运行gclient sync
+	5).再次卡在gclient sync，根据错误提示重复上面的步骤
+	
+4.gclient sync 过程中发现最后卡在 generate_location_tags.py 
 	将/etc/environment 添加的代理去掉，然后shell命令行添加  
 	export HTTP_PROXY=socks5://127.0.0.1:1080  
 	export HTTPS_PROXY=socks5://127.0.0.1:1080  
-	成功了，这有可能是巧合？？？  
-
+	根据错误提示直接运行脚步
+	如: vpython3 src/testing/generate_location_tags.py --out src/testing/location_tags.json  
+	再次运行gclient sync...
+	祝你好运！
 	
 	
 
@@ -100,3 +117,8 @@ https://webrtc.googlesource.com/src/+/main/docs/native-code/development/index.md
 	<targetname> 表示对应.gn要生成的目标文件，通常是.gn文件中static_library(name)或executable(name)这样的形式  
 	比如.ninja中有个宏，我想知道它是在哪里定义的，可以输入以下命令：  
 	gn desc out/Default/ :webrtc_lib_link_test defines --blame  
+
+
+四.运行demo
+	程序崩溃???!!!...
+	放弃。。。
